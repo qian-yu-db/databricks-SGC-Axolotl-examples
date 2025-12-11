@@ -7,13 +7,6 @@
 
 # COMMAND ----------
 
-import os
-
-os.environ['NCCL_TIMEOUT'] = '1800'
-os.environ['TORCH_NCCL_BLOCKING_WAIT'] = '1'
-
-# COMMAND ----------
-
 # MAGIC %md
 # MAGIC ## Add helpful messages to the log
 
@@ -88,7 +81,7 @@ from serverless_gpu.launcher import distributed
 from serverless_gpu.compute import GPUType
 
 @distributed(gpus=16, gpu_type=GPUType.H100, remote=True)
-def launch_accelerate(**kwargs):
+def launch_job(**kwargs):
     import os
     import time
     from axolotl.cli.train import do_cli as do_train
@@ -104,7 +97,7 @@ def launch_accelerate(**kwargs):
 
 # COMMAND ----------
 
-launch_accelerate.distributed()
+launch_job.distributed()
 
 # COMMAND ----------
 

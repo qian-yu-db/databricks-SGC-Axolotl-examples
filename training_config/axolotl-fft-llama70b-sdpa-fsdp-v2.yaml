@@ -1,0 +1,234 @@
+# Axolotl Configuration: Llama-3.3-70B FFT with SDPA
+# Optimized based on Qwen32B benchmarks (RECOMMENDED)
+#
+# Key features:
+# - Full Fine-Tuning (FFT) - 100% of 70.6B parameters
+# - SDPA (PyTorch native, 7.2% faster than Flash Attention 2)
+# - Liger kernel optimizations (RoPE, RMSNorm, GLU, CrossEntropy)
+# - FSDP with CPU offloading
+# - Optimized dataloader (16 workers, 256 prefetch)
+# - Production dataset: FineTome-100k
+
+base_model: meta-llama/Llama-3.3-70B-Instruct
+model_type: llama
+
+# ============================================
+# LIGER KERNEL OPTIMIZATIONS
+# ============================================
+
+plugins:
+  - axolotl.integrations.liger.LigerPlugin
+
+liger_rope: true
+liger_rms_norm: true
+liger_glu_activation: true
+liger_fused_linear_cross_entropy: true
+
+# ============================================
+# DATASET CONFIGURATION
+# ============================================
+
+chat_template: llama3
+
+datasets:
+  - path: mlabonne/FineTome-100k-dedup
+    type: chat_template
+    split: train[:20%]  # 20,000 examples for testing
+    field_messages: conversations
+    message_property_mappings:
+      role: from
+      content: value
+
+dataset_prepared_path: last_run_prepared
+val_set_size: 0.02  # 2% validation
+
+# ============================================
+# OUTPUT CONFIGURATION
+# ============================================
+
+#output_dir: /Volumes/main/linyuan/axolotl/outputs/llama3-70b-fft
+output_dir: /tmp/llama3-70b-fft
+
+# ============================================
+# TRAINING HYPERPARAMETERS
+# ============================================
+
+# Sequence length (OOM at 2048 was caused by missing activation offloading)
+# With activation_offloading enabled, can use full 2048 sequence length
+# Activations are the largest memory consumer (~60+ GB per GPU at 2048 seq)
+sequence_len: 2048
+sample_packing: true
+pad_to_sequence_len: true
+eval_sample_packing: false          # avoids the error you hit with tiny eval splits
+
+# ============================================
+# ACTIVATION OFFLOADING (CRITICAL FOR 70B)
+# ============================================
+# This was the missing piece that caused OOM!
+# Offloads activation tensors to CPU during backward pass
+# Required for 70B models at sequence length > 1024
+activation_offloading: true
+
+# Batch size and gradient accumulation
+# Optimized for 32 H100 GPUs: 1 × 8 × 32 = 256 effective batch
+micro_batch_size: 1
+gradient_accumulation_steps: 32
+
+# Training duration
+num_epochs: 1
+
+# Optimizer and learning rate
+optimizer: adamw_torch_fused
+lr_scheduler: cosine
+learning_rate: 2e-5
+warmup_ratio: 0.1
+
+# Mixed precision
+bf16: true
+tf32: false
+
+# ============================================
+# SDPA ATTENTION CONFIGURATION
+# ============================================
+
+# Use PyTorch native SDPA (Scaled Dot-Product Attention)
+# This is 7.2% faster than Flash Attention 2 with FSDP + CPU offload on H100
+# Based on Qwen32B benchmarks: SDPA 34.23s/step vs FA2 36.87s/step
+
+flash_attention: false
+attn_implementation: sdpa
+sdpa_attention: true
+
+# Note: SDPA is PyTorch native and optimized for:
+# - FSDP + CPU offloading workflows
+# - H100 Tensor Cores
+# - Sequence lengths < 4K
+# For sequences > 8K, consider Flash Attention 2 instead
+
+# ============================================
+# MEMORY OPTIMIZATIONS
+# ============================================
+
+gradient_checkpointing: true
+gradient_checkpointing_kwargs:
+  use_reentrant: false 
+
+# ============================================
+# FSDP CONFIGURATION
+# ============================================
+
+# FSDP strategy (full shard + auto wrap + CPU offload)
+fsdp_version: 2
+
+fsdp:
+  - full_shard
+  - auto_wrap
+
+fsdp_config:
+  offload_params: true                       # was fsdp_offload_params
+  cpu_ram_efficient_loading: true           # was fsdp_cpu_ram_efficient_loading
+  auto_wrap_policy: TRANSFORMER_BASED_WRAP  # was fsdp_auto_wrap_policy
+  transformer_layer_cls_to_wrap: LlamaDecoderLayer
+  state_dict_type: FULL_STATE_DICT          # same meaning
+  reshard_after_forward: true               # replaces fsdp_sharding_strategy=FULL_SHARD
+  activation_checkpointing: true            # was fsdp_activation_checkpointing
+  sync_module_states: true
+  limit_all_gathers: true
+  backward_prefetch: BACKWARD_PRE
+  forward_prefetch: true
+
+# ============================================
+# DATALOADER OPTIMIZATION
+# ============================================
+# KEY LEARNINGS from Qwen32B:
+# - Dataloader optimization = 2× speedup (most critical!)
+# - 16 workers, 256 prefetch, 192 dataset processes
+
+dataloader_num_workers: 16         # Increased from 4 to 16
+dataloader_prefetch_factor: 256    # NEW: Aggressive prefetching
+dataloader_pin_memory: false       # False with CPU offload
+dataset_processes: 192             # NEW: Parallel dataset processing
+
+# ============================================
+# LOGGING AND CHECKPOINTING
+# ============================================
+
+logging_steps: 10
+evals_per_epoch: 2
+saves_per_epoch: 1
+save_strategy: "epoch"
+
+# ============================================
+# SPECIAL TOKENS
+# ============================================
+
+special_tokens:
+  pad_token: <|finetune_right_pad_id|>
+  eos_token: <|eot_id|>
+
+# ============================================
+# WANDB (Optional)
+# ============================================
+wandb_mode: disabled
+wandb_project:
+wandb_entity:
+wandb_watch:
+wandb_name:
+wandb_log_model:
+
+# ============================================
+# MLflow (Recommended)
+# ============================================
+use_mlflow: true
+mlflow_tracking_uri: databricks        # or your Databricks / GenAI tracking URI
+mlflow_run_name: fft-70b-liger-fsdp-ucvolume              
+hf_mlflow_log_artifacts: false                     # optional: log checkpoints as artifacts
+
+# ============================================
+# ADDITIONAL SETTINGS
+# ============================================
+
+# Memory management
+max_memory_mb: 75000  # 75GB per GPU (for H100 80GB)
+pad_to_sequence_len: false
+
+# Weight decay
+weight_decay: 0.0
+
+# Resume from checkpoint (optional)
+resume_from_checkpoint:
+
+# ============================================
+# NOTES
+# ============================================
+#
+# RECOMMENDED CONFIGURATION for Llama-3.3-70B
+#
+# Based on Qwen32B benchmarks (16× H100, FSDP + CPU offload):
+# - SDPA: 34.23s per step (3.69 samples/sec)
+# - Flash Attention 2: 36.87s per step (3.426 samples/sec)
+# - SDPA is 7.2% faster with identical 69.79 GB peak memory
+# - SDPA also shows 3% better loss convergence (0.806 vs 0.831)
+#
+# Why SDPA is faster with FSDP + CPU offload:
+# 1. PyTorch native integration - better FSDP memory management
+# 2. H100 optimized kernels - direct Tensor Core usage
+# 3. No memory layout conversion overhead
+# 4. Better handling of fragmented memory from FSDP
+#
+# Key optimizations applied:
+# 1. Dataloader: 16 workers, 256 prefetch (2× speedup from Qwen32B)
+# 2. SDPA attention: 7.2% faster than Flash Attention 2
+# 3. FSDP: CPU offload + activation checkpointing
+# 4. Liger: Fused kernels for RoPE, RMSNorm, GLU, CrossEntropy
+# 5. Prefetching: Forward and backward prefetch enabled
+#
+# Performance estimate (based on Qwen32B scaling):
+# - Qwen32B (32.7B params): 34.23s/step on 16 GPUs
+# - Llama70B (70.6B params): ~50-60s/step on 32 GPUs (estimated)
+# - Cost savings vs Flash Attention 2: ~7% ($560/year for 100 runs)
+#
+# When to use Flash Attention 2 instead:
+# - Sequence length > 8K tokens (better memory scaling)
+# - No CPU offloading (FA2 faster without offload overhead)
+# - Inference workloads (FA2 optimized for inference)

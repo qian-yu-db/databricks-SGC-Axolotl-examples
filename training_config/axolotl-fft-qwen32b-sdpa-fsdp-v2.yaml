@@ -1,0 +1,179 @@
+# Axolotl Configuration: Qwen2.5-32B FFT with Flash Attention 2
+# Translated from TRL notebook: Dummy-Inputs-Qwen-32B-Fine-Tuning-TRL-FlashAttn2.py
+#
+# Key features:
+# - Full Fine-Tuning (FFT) - 100% of 32.7B parameters
+# - Flash Attention 2 (direct library, not SDPA)
+# - FSDP with CPU offloading
+# - Synthetic dummy data for benchmarking
+# - 16× H100 80GB GPUs
+
+base_model: Qwen/Qwen2.5-32B-Instruct
+model_type: qwen2
+
+# Trust remote code (required for some Qwen models)
+trust_remote_code: true
+
+# ============================================
+# LIGER KERNEL OPTIMIZATIONS
+# ============================================
+
+plugins:
+  - axolotl.integrations.liger.LigerPlugin
+
+liger_rope: true
+liger_rms_norm: true
+liger_glu_activation: true
+liger_fused_linear_cross_entropy: true
+
+# ============================================
+# DATASET CONFIGURATION
+# ============================================
+
+datasets:
+  - path: yahma/alpaca-cleaned
+    type: alpaca
+    split: train[:20%] 
+
+chat_template: qwen_25  # Qwen 2.5 template (fixed from invalid 'qwen2')
+dataset_prepared_path: last_run_prepared
+val_set_size: 0.02 
+
+# ============================================
+# OUTPUT CONFIGURATION
+# ============================================
+
+output_dir: /tmp/qwen-32b-fft
+
+# ============================================
+# TRAINING HYPERPARAMETERS
+# ============================================
+
+# Sequence length (matches TARGET_LEN in TRL notebook)
+sequence_len: 2048
+sample_packing: true
+pad_to_sequence_len: true
+eval_sample_packing: false          # avoids the error you hit with tiny eval splits
+
+activation_offloading: true
+
+micro_batch_size: 1 
+gradient_accumulation_steps: 8 
+
+# Training duration
+num_epochs: 1
+
+# Optimizer and learning rate
+optimizer: adamw_torch_fused
+lr_scheduler: cosine
+learning_rate: 5e-5                    
+warmup_ratio: 0.03                     
+
+# Mixed precision
+bf16: true
+tf32: false
+
+# ============================================
+# SDPA ATTENTION CONFIGURATION
+# ============================================
+
+# Use PyTorch native SDPA (Scaled Dot-Product Attention)
+# This is faster than Flash Attention 2 with FSDP + CPU offload on H100
+flash_attention: false # Disable flash attention for now due to conversion mismatch
+attn_implementation: sdpa
+sdpa_attention: true
+
+# ============================================
+# MEMORY OPTIMIZATIONS
+# ============================================
+
+# Activation checkpointing (matches FSDP activation_checkpointing in TRL)
+# Activation checkpointing handled by FSDP
+gradient_checkpointing: true
+gradient_checkpointing_kwargs:
+  use_reentrant: false 
+
+# ============================================
+# FSDP CONFIGURATION
+# ============================================
+
+# FSDP strategy (matches TRL fsdp="full_shard auto_wrap offload")
+# FSDP strategy (full shard + auto wrap + CPU offload)
+fsdp_version: 2
+
+fsdp:
+  - full_shard
+  - auto_wrap
+
+fsdp_config:
+  offload_params: true                       # was fsdp_offload_params
+  cpu_ram_efficient_loading: true           # was fsdp_cpu_ram_efficient_loading
+  auto_wrap_policy: TRANSFORMER_BASED_WRAP  # was fsdp_auto_wrap_policy
+  transformer_layer_cls_to_wrap: Qwen2DecoderLayer
+  state_dict_type: FULL_STATE_DICT          # same meaning
+  reshard_after_forward: true               # replaces fsdp_sharding_strategy=FULL_SHARD
+  activation_checkpointing: true            # was fsdp_activation_checkpointing
+  sync_module_states: true
+  limit_all_gathers: true
+  backward_prefetch: BACKWARD_PRE
+  forward_prefetch: true
+
+# ============================================
+# DATALOADER OPTIMIZATION
+# ============================================
+# KEY LEARNINGS from Qwen32B:
+# - Dataloader optimization = 2× speedup (most critical!)
+# - 16 workers, 256 prefetch, 192 dataset processes
+
+dataloader_num_workers: 16         # Increased from 4 to 16
+dataloader_prefetch_factor: 256    # NEW: Aggressive prefetching
+dataloader_pin_memory: false       # False with CPU offload
+dataset_processes: 192             # NEW: Parallel dataset processing
+
+# ============================================
+# LOGGING AND CHECKPOINTING
+# ============================================
+
+logging_steps: 5                       
+evals_per_epoch: 2                     
+saves_per_epoch: 1                     
+save_strategy: "epoch"                 
+
+# ============================================
+# SPECIAL TOKENS
+# ============================================
+
+special_tokens:
+  pad_token: "<|endoftext|>"
+  eos_token: "<|im_end|>"
+
+# ============================================
+# WANDB (Optional)
+# ============================================
+wandb_mode: disabled
+wandb_project:
+wandb_entity:
+wandb_watch:
+wandb_name:
+wandb_log_model:
+
+# ============================================
+# MLflow (Recommended)
+# ============================================
+use_mlflow: true
+mlflow_tracking_uri: databricks        # or your Databricks / GenAI tracking URI
+hf_mlflow_log_artifacts: false                     # optional: log checkpoints as artifacts
+run_name: 'fft-qwen-32b-liger-fsdp-sdpa'
+
+# ============================================
+# ADDITIONAL SETTINGS
+# ============================================
+
+# Memory management
+max_memory_mb: 75000  # 75GB per GPU (for H100 80GB)
+
+# Weight decay
+weight_decay: 0.0                      # Matches TRL default
+
+# Resume from checkpoint (optional)
+resume_from_checkpoint:

@@ -1,4 +1,19 @@
 # Databricks notebook source
+# MAGIC %md
+# MAGIC # Fine-Tune with Databricks SGC
+# MAGIC
+# MAGIC [<img src="https://raw.githubusercontent.com/axolotl-ai-cloud/axolotl/main/image/axolotl-badge-web.png" alt="Built with Axolotl" width="200" height="32"/>](https://github.com/axolotl-ai-cloud/axolotl)
+# MAGIC
+# MAGIC Axolotl is the most performant LLM post-training framework available, delivering faster training with efficient, consistent and stable performance. Train your workload and ship your product 30% faster; saving you both time and money.
+# MAGIC
+# MAGIC - ⭐ us on [GitHub](https://github.com/axolotl-ai-cloud/axolotl)
+# MAGIC - 📜 Read the [Docs](http://docs.axolotl.ai/)
+# MAGIC - 💬 Chat with us on [Discord](https://discord.gg/mnpEYgRUmD)
+# MAGIC - 📰 Get updates on [X/Twitter](https://x.com/axolotl_ai)
+# MAGIC
+
+# COMMAND ----------
+
 # MAGIC %pip install -U packaging setuptools wheel ninja mlflow>=3.6
 # MAGIC %pip install --no-build-isolation axolotl[flash-attn,deepspeed]
 # MAGIC %pip install --force-reinstall --no-cache-dir --no-deps "https://github.com/Dao-AILab/flash-attention/releases/download/v2.7.4.post1/flash_attn-2.7.4.post1+cu12torch2.6cxx11abiFALSE-cp312-cp312-linux_x86_64.whl"

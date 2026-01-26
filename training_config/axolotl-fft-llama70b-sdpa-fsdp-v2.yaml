@@ -3,7 +3,6 @@
 #
 # Key features:
 # - Full Fine-Tuning (FFT) - 100% of 70.6B parameters
-# - SDPA (PyTorch native, 7.2% faster than Flash Attention 2)
 # - Liger kernel optimizations (RoPE, RMSNorm, GLU, CrossEntropy)
 # - FSDP with CPU offloading
 # - Optimized dataloader (16 workers, 256 prefetch)
@@ -53,9 +52,7 @@ output_dir: /tmp/llama3-70b-fft
 # TRAINING HYPERPARAMETERS
 # ============================================
 
-# Sequence length (OOM at 2048 was caused by missing activation offloading)
 # With activation_offloading enabled, can use full 2048 sequence length
-# Activations are the largest memory consumer (~60+ GB per GPU at 2048 seq)
 sequence_len: 2048
 sample_packing: true
 pad_to_sequence_len: true
@@ -91,19 +88,10 @@ tf32: false
 # SDPA ATTENTION CONFIGURATION
 # ============================================
 
-# Use PyTorch native SDPA (Scaled Dot-Product Attention)
-# This is 7.2% faster than Flash Attention 2 with FSDP + CPU offload on H100
-# Based on Qwen32B benchmarks: SDPA 34.23s/step vs FA2 36.87s/step
 
 flash_attention: false
 attn_implementation: sdpa
 sdpa_attention: true
-
-# Note: SDPA is PyTorch native and optimized for:
-# - FSDP + CPU offloading workflows
-# - H100 Tensor Cores
-# - Sequence lengths < 4K
-# For sequences > 8K, consider Flash Attention 2 instead
 
 # ============================================
 # MEMORY OPTIMIZATIONS
@@ -140,9 +128,6 @@ fsdp_config:
 # ============================================
 # DATALOADER OPTIMIZATION
 # ============================================
-# KEY LEARNINGS from Qwen32B:
-# - Dataloader optimization = 2× speedup (most critical!)
-# - 16 workers, 256 prefetch, 192 dataset processes
 
 dataloader_num_workers: 16         # Increased from 4 to 16
 dataloader_prefetch_factor: 256    # NEW: Aggressive prefetching
@@ -197,38 +182,3 @@ weight_decay: 0.0
 
 # Resume from checkpoint (optional)
 resume_from_checkpoint:
-
-# ============================================
-# NOTES
-# ============================================
-#
-# RECOMMENDED CONFIGURATION for Llama-3.3-70B
-#
-# Based on Qwen32B benchmarks (16× H100, FSDP + CPU offload):
-# - SDPA: 34.23s per step (3.69 samples/sec)
-# - Flash Attention 2: 36.87s per step (3.426 samples/sec)
-# - SDPA is 7.2% faster with identical 69.79 GB peak memory
-# - SDPA also shows 3% better loss convergence (0.806 vs 0.831)
-#
-# Why SDPA is faster with FSDP + CPU offload:
-# 1. PyTorch native integration - better FSDP memory management
-# 2. H100 optimized kernels - direct Tensor Core usage
-# 3. No memory layout conversion overhead
-# 4. Better handling of fragmented memory from FSDP
-#
-# Key optimizations applied:
-# 1. Dataloader: 16 workers, 256 prefetch (2× speedup from Qwen32B)
-# 2. SDPA attention: 7.2% faster than Flash Attention 2
-# 3. FSDP: CPU offload + activation checkpointing
-# 4. Liger: Fused kernels for RoPE, RMSNorm, GLU, CrossEntropy
-# 5. Prefetching: Forward and backward prefetch enabled
-#
-# Performance estimate (based on Qwen32B scaling):
-# - Qwen32B (32.7B params): 34.23s/step on 16 GPUs
-# - Llama70B (70.6B params): ~50-60s/step on 32 GPUs (estimated)
-# - Cost savings vs Flash Attention 2: ~7% ($560/year for 100 runs)
-#
-# When to use Flash Attention 2 instead:
-# - Sequence length > 8K tokens (better memory scaling)
-# - No CPU offloading (FA2 faster without offload overhead)
-# - Inference workloads (FA2 optimized for inference)

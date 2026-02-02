@@ -14,10 +14,12 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install -U packaging setuptools wheel ninja mlflow>=3.6
-# MAGIC %pip install --no-build-isolation axolotl[flash-attn,deepspeed]
-# MAGIC %pip install --force-reinstall --no-cache-dir --no-deps "https://github.com/Dao-AILab/flash-attention/releases/download/v2.7.4.post1/flash_attn-2.7.4.post1+cu12torch2.6cxx11abiFALSE-cp312-cp312-linux_x86_64.whl"
-# MAGIC %pip install threadpoolctl==3.1.0 -q
+%pip install -U packaging setuptools wheel ninja mlflow>=3.6
+%pip install --no-build-isolation axolotl[flash-attn,deepspeed]
+%pip install --force-reinstall --no-cache-dir --no-deps "https://github.com/Dao-AILab/flash-attention/releases/download/v2.7.4.post1/flash_attn-2.7.4.post1+cu12torch2.6cxx11abiFALSE-cp312-cp312-linux_x86_64.whl"
+%pip install "cut-cross-entropy[transformers] @ git+https://github.com/axolotl-ai-cloud/ml-cross-entropy.git@f643b88"
+
+# COMMAND ----------
 # MAGIC dbutils.library.restartPython()
 
 # COMMAND ----------

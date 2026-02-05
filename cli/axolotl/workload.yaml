@@ -1,0 +1,33 @@
+experiment_name: axolotl-llama-8b
+
+environment:
+  dependencies: requirements.yaml
+  env_variables_secrets:   
+    # change this to your databrick secret "scope/your_secret" that stores the huggingface token
+    HF_TOKEN: "sgc-nightly-notebook/hf_token"
+compute:
+  gpus: 16
+  gpu_type: h100
+
+max_retries: 0
+code_source:
+  type: snapshot
+  snapshot:
+    # change this to your local repo path
+    repo_path: /Users/lin.yuan/work/ml-misc  
+
+command: |-
+  # path to the accelerate config
+  # $HOME here is in remote GPU worker, not local machine
+  ACCEL_CONFIG="$HOME/databricks-SGC-Axolotl-examples/cli/axolotl/accelerate_config.yaml"
+  # path to the training config
+  TRAIN_CONFIG="$HOME/databricks-SGC-Axolotl-examples/cli/axolotl/fft-8b-liger-fsdp.yaml"
+
+  accelerate launch \
+    --config_file "$ACCEL_CONFIG" \
+    --machine_rank=$NODE_RANK \
+    --num_machines 2 \
+    --num_processes $WORLD_SIZE \
+    --main_process_ip $MASTER_ADDR \
+    --main_process_port $MASTER_PORT \
+    -m axolotl.cli.train "$TRAIN_CONFIG"

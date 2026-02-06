@@ -4,7 +4,7 @@ environment:
   dependencies: requirements.yaml
   env_variables_secrets:   
     # change this to your databrick secret "scope/your_secret" that stores the huggingface token
-    HF_TOKEN: "LLM_tokens_qyu/huggingface"
+    HF_TOKEN: "sgc-nightly-notebook/hf_token"
 compute:
   gpus: 16
   gpu_type: h100

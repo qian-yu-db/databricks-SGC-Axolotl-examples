@@ -4,7 +4,7 @@ environment:
   dependencies: requirements.yaml
   env_variables_secrets:   
     # change this to your databrick secret "scope/your_secret" that stores the huggingface token
-    HF_TOKEN: "sgc-nightly-notebook/hf_token"
+    HF_TOKEN: "LLM_tokens_qyu/huggingface"
 compute:
   gpus: 16
   gpu_type: h100
@@ -14,7 +14,7 @@ code_source:
   type: snapshot
   snapshot:
     # change this to your local repo path
-    repo_path: /Users/lin.yuan/work/ml-misc  
+    repo_path: /Users/q.yu/databricks-SGC-Axolotl-examples
 
 command: |-
   # path to the accelerate config

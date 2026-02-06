@@ -421,7 +421,7 @@ wheels = [
 [[package]]
 name = "databricks-serverless-gpu-cli"
 version = "0.0.2"
-source = { path = "cli/databricks_serverless_gpu_cli-0.0.2-py3-none-any.whl" }
+source = { path = "../workspace/developments/databricks-SGC-Axolotl-examples/cli/databricks_serverless_gpu_cli-0.0.2-py3-none-any.whl" }
 dependencies = [
     { name = "cloudpickle" },
     { name = "databricks-connect" },
@@ -2035,7 +2035,7 @@ dependencies = [
 requires-dist = [
     { name = "databricks-connect", specifier = ">=15.4.2,<16" },
     { name = "databricks-sdk", specifier = ">=0.65.0" },
-    { name = "databricks-serverless-gpu-cli", path = "cli/databricks_serverless_gpu_cli-0.0.2-py3-none-any.whl" },
+    { name = "databricks-serverless-gpu-cli", path = "../workspace/developments/databricks-SGC-Axolotl-examples/cli/databricks_serverless_gpu_cli-0.0.2-py3-none-any.whl" },
     { name = "ipykernel", specifier = ">=6.30.1" },
     { name = "mlflow", specifier = ">=2.17,<3.0" },
     { name = "python-dotenv", specifier = ">=1.1.1" },
